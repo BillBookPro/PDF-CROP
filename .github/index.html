@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crop PDF</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--red:#e8192c;--red-dark:#c0121f;--red-light:#fff0f1;--text:#333;--text2:#666;--text3:#999;--shadow:0 2px 12px rgba(0,0,0,.10);--shadow2:0 6px 28px rgba(0,0,0,.15)}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* NAV */
+#nav{height:54px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;padding:0 22px;gap:10px;position:sticky;top:0;z-index:200;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.logo{font-size:20px;font-weight:700;color:var(--red);letter-spacing:-.5px}.logo span{color:#222}
+#nav-right{margin-left:auto;display:flex;gap:10px}
+#nav-right button{background:none;border:1.5px solid #ddd;border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;color:var(--text2)}
+#nav-right .su{background:var(--red);color:#fff;border-color:var(--red)}
+
+/* UPLOAD */
+#upload-screen{min-height:calc(100vh - 54px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;background:#f8f8f8}
+#upload-screen h1{font-size:34px;font-weight:700;color:#1a1a1a;margin-bottom:10px;text-align:center}
+.tagline{font-size:16px;color:var(--text2);text-align:center;margin-bottom:36px;max-width:520px;line-height:1.6}
+#drop-zone{width:100%;max-width:570px;border:2.5px dashed #ccc;border-radius:16px;background:#fff;padding:52px 32px 40px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;box-shadow:var(--shadow)}
+#drop-zone.drag-over{border-color:var(--red);background:var(--red-light)}
+.dz-icon{font-size:52px;display:block;margin-bottom:20px}
+#sel-btn{display:inline-flex;align-items:center;gap:8px;background:var(--red);color:#fff;border:none;border-radius:9px;padding:14px 30px;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:14px;box-shadow:0 4px 14px rgba(232,25,44,.25);transition:background .15s}
+#sel-btn:hover{background:var(--red-dark)}
+.drop-txt{font-size:14px;color:var(--text3);margin-bottom:22px}
+.cloud-row{display:flex;gap:12px;justify-content:center}
+.cbtn{display:flex;align-items:center;gap:7px;border:1.5px solid #ddd;background:#fff;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer;color:var(--text2);font-weight:500;transition:border-color .15s}
+.cbtn:hover{border-color:#aaa}
+#file-inp{display:none}
+
+/* THUMB */
+#thumb-screen{display:none;min-height:calc(100vh - 54px);background:#efefef}
+#thumb-toolbar{background:#fff;border-bottom:1px solid #e5e5e5;padding:11px 22px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+#tb-fn{font-size:14px;font-weight:600;color:#333;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-sp{flex:1}
+#do-crop-tb{display:flex;align-items:center;gap:7px;background:var(--red);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 3px 10px rgba(232,25,44,.2);transition:background .15s}
+#do-crop-tb:hover{background:var(--red-dark)}
+#pages-grid{padding:30px 24px;display:flex;flex-wrap:wrap;gap:20px}
+.page-card{background:#fff;border-radius:10px;box-shadow:var(--shadow);cursor:pointer;transition:box-shadow .2s,transform .2s;overflow:hidden;display:flex;flex-direction:column;align-items:center;border:2.5px solid transparent}
+.page-card:hover{box-shadow:var(--shadow2);transform:translateY(-2px)}
+.page-card canvas{display:block;max-width:150px;height:auto}
+.pg-foot{display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 10px 10px}
+.pg-num{font-size:12px;color:var(--text3)}
+.crop-badge{display:none;background:var(--red-light);color:var(--red);font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px}
+.page-card.has-crop .crop-badge{display:block}
+
+/* CROP SCREEN */
+#crop-screen{display:none;position:fixed;inset:0;z-index:300;flex-direction:column}
+#crop-screen.open{display:flex}
+#ctopbar{height:52px;background:#1e1e1e;display:flex;align-items:center;padding:0 18px;gap:14px;flex-shrink:0;border-bottom:1px solid #333}
+#back-btn{display:flex;align-items:center;gap:6px;background:none;border:1px solid #555;border-radius:7px;padding:6px 14px;color:#ccc;font-size:13px;cursor:pointer;transition:border-color .15s,color .15s}
+#back-btn:hover{border-color:#aaa;color:#fff}
+#ctop-fn{font-size:13px;color:#777;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pg-counter{margin-left:auto;color:#777;font-size:13px}
+.zoom-tb{display:flex;align-items:center;gap:8px;margin-left:16px}
+.zoom-tb button{width:28px;height:28px;border:1px solid #555;border-radius:5px;background:none;color:#ccc;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s,color .15s}
+.zoom-tb button:hover{border-color:#aaa;color:#fff}
+#zoom-lbl{font-size:12px;color:#888;min-width:42px;text-align:center}
+
+/* crop body */
+#crop-body{flex:1;display:flex;overflow:hidden;background:#2c2c2c}
+
+/* SCROLLABLE PAGES AREA */
+#pages-scroll{flex:1;overflow-y:auto;padding:40px 0 60px;display:flex;flex-direction:column;align-items:center;gap:32px;background:#404040;cursor:crosshair}
+
+/* per-page wrapper */
+.pg-wrap{position:relative;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,.6);outline:1px solid #888}
+.pg-wrap canvas{display:block}
+.pg-label{position:absolute;bottom:-24px;left:50%;transform:translateX(-50%);font-size:11px;color:#666;white-space:nowrap;pointer-events:none}
+
+/* overlay svg per page */
+.pg-ov{position:absolute;top:0;left:0;pointer-events:none}
+
+/* crop box (one global, moves between pages) */
+#cbox{position:fixed;border:2px dashed rgba(100,180,255,.92);pointer-events:none;z-index:400;display:none}
+#cbox-mover{position:absolute;inset:0;cursor:move;pointer-events:all}
+.ch{position:absolute;width:11px;height:11px;background:#cce8ff;border:2px solid #4aacff;z-index:10;pointer-events:all}
+
+/* SIDEBAR */
+#crop-sb{width:248px;background:#fff;display:flex;flex-direction:column;padding:22px 18px;flex-shrink:0;overflow-y:auto;border-left:1px solid #e0e0e0}
+#crop-sb h2{font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:5px}
+.sb-sub{font-size:12px;color:var(--text3);margin-bottom:20px;line-height:1.6}
+#apply-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--red);color:#fff;border:none;border-radius:9px;padding:13px;font-size:15px;font-weight:600;cursor:pointer;width:100%;margin-bottom:9px;box-shadow:0 4px 12px rgba(232,25,44,.2);transition:background .15s}
+#apply-btn:hover{background:var(--red-dark)}
+#reset-all{background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;padding:3px;width:100%;text-align:center;margin-bottom:20px}
+#reset-all:hover{text-decoration:underline}
+.sb-div{border-top:1px solid #eee;margin:0 0 16px}
+.sb-lbl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;display:block}
+.pages-grp{display:flex;flex-direction:column;gap:9px;margin-bottom:20px}
+.pages-grp label{display:flex;align-items:center;gap:9px;font-size:14px;color:#333;cursor:pointer;padding:8px 11px;border:1.5px solid #eee;border-radius:8px;transition:border-color .15s,background .15s}
+.pages-grp label:has(input:checked){border-color:var(--red);background:var(--red-light);color:var(--red)}
+.pages-grp input[type=radio]{accent-color:var(--red);width:15px;height:15px}
+.coords{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
+.cf{display:flex;flex-direction:column;gap:3px}
+.cf label{font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.cf input{border:1.5px solid #e0e0e0;border-radius:7px;padding:6px 8px;font-size:13px;color:#222;width:100%;transition:border-color .15s}
+.cf input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 3px rgba(232,25,44,.1)}
+.sb-tip{background:#fff8e1;border:1.5px solid #ffe082;border-radius:8px;padding:10px 12px;font-size:12px;color:#7a5900;line-height:1.6;margin-top:auto}
+#cur-pg-info{font-size:12px;color:var(--text3);margin-bottom:14px;padding:7px 10px;background:#f5f5f5;border-radius:7px;text-align:center}
+
+/* DL */
+#dl-screen{display:none;min-height:calc(100vh - 54px);align-items:center;justify-content:center;flex-direction:column;gap:18px;padding:60px 20px;background:#f8f8f8}
+#dl-screen.open{display:flex}
+.dl-check{width:72px;height:72px;background:var(--red-light);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:6px}
+#dl-screen h2{font-size:26px;font-weight:700;color:#1a1a1a}
+#dl-screen p{font-size:14px;color:var(--text2)}
+#dl-btn{display:flex;align-items:center;gap:8px;background:var(--red);color:#fff;border:none;border-radius:9px;padding:14px 34px;font-size:16px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(232,25,44,.25);transition:background .15s}
+#dl-btn:hover{background:var(--red-dark)}
+#crop-another{background:none;border:1.5px solid #ccc;border-radius:8px;padding:12px 28px;font-size:14px;cursor:pointer;color:var(--text2)}
+#crop-another:hover{border-color:#aaa}
+
+/* PROGRESS */
+#prog{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:999;align-items:center;justify-content:center}
+#prog.open{display:flex}
+.prog-card{background:#fff;border-radius:16px;padding:36px 44px;text-align:center;min-width:270px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.prog-card p{font-size:15px;color:#333;margin-bottom:18px;font-weight:500}
+.prog-track{height:6px;background:#eee;border-radius:3px;overflow:hidden}
+#prog-bar{height:100%;background:var(--red);border-radius:3px;width:0;transition:width .4s}
+</style>
+</head>
+<body>
+
+<nav id="nav">
+  <div class="logo">iLove<span>PDF</span></div>
+  <span style="font-size:13px;color:#bbb;margin-left:6px">›</span>
+  <span style="font-size:13px;color:#555;margin-left:4px">Crop PDF</span>
+  <div id="nav-right">
+    <button>Login</button>
+    <button class="su">Sign up</button>
+  </div>
+</nav>
+
+<!-- UPLOAD -->
+<div id="upload-screen">
+  <h1>Crop PDF</h1>
+  <p class="tagline">Trim PDF margins in seconds. Easily resize PDF pages with the PDF cropper.</p>
+  <div id="drop-zone" onclick="document.getElementById('file-inp').click()">
+    <span class="dz-icon">📄</span>
+    <button id="sel-btn" onclick="event.stopPropagation();document.getElementById('file-inp').click()">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L8 8m4-4l4 4M4 20h16"/></svg>
+      Select PDF file
+    </button>
+    <p class="drop-txt">or drop PDF here</p>
+    <div class="cloud-row">
+      <button class="cbtn" onclick="event.stopPropagation()">
+        <svg width="15" height="15" viewBox="0 0 24 24"><rect width="24" height="24" rx="3" fill="#4285F4"/><path d="M6 18l3-5 3 3 4-6 4 8H6z" fill="white"/></svg>
+        Google Drive
+      </button>
+      <button class="cbtn" onclick="event.stopPropagation()">
+        <svg width="15" height="15" viewBox="0 0 24 24"><rect width="24" height="24" rx="3" fill="#0061FF"/><circle cx="12" cy="12" r="5" fill="white"/><circle cx="12" cy="12" r="2.5" fill="#0061FF"/></svg>
+        Dropbox
+      </button>
+    </div>
+  </div>
+  <input type="file" id="file-inp" accept=".pdf">
+</div>
+
+<!-- THUMBNAILS -->
+<div id="thumb-screen">
+  <div id="thumb-toolbar">
+    <span id="tb-fn">document.pdf</span>
+    <div class="tb-sp"></div>
+    <button id="do-crop-tb" onclick="openCropScreen()">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke="white" stroke-width="2"/><rect x="8" y="8" width="8" height="8" rx="1" stroke="white" stroke-width="1.5"/></svg>
+      Crop PDF
+    </button>
+  </div>
+  <div id="pages-grid"></div>
+</div>
+
+<!-- CROP SCREEN -->
+<div id="crop-screen">
+  <div id="ctopbar">
+    <button id="back-btn" onclick="closeCropScreen()">
+      <svg width="13" height="13" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Back
+    </button>
+    <span id="ctop-fn"></span>
+    <span id="pg-counter"></span>
+    <div class="zoom-tb">
+      <button onclick="adjZoom(-0.15)">−</button>
+      <span id="zoom-lbl">100%</span>
+      <button onclick="adjZoom(0.15)">+</button>
+    </div>
+  </div>
+
+  <div id="crop-body">
+    <!-- Word-style scrollable pages -->
+    <div id="pages-scroll">
+      <!-- pages injected here dynamically -->
+    </div>
+
+    <!-- Floating crop box (position:fixed, managed by JS) -->
+    <div id="cbox">
+      <div id="cbox-mover"></div>
+      <div class="ch" id="h-tl" style="top:-6px;left:-6px;cursor:nw-resize"></div>
+      <div class="ch" id="h-tm" style="top:-6px;left:calc(50% - 5.5px);cursor:n-resize"></div>
+      <div class="ch" id="h-tr" style="top:-6px;right:-6px;cursor:ne-resize"></div>
+      <div class="ch" id="h-ml" style="top:calc(50% - 5.5px);left:-6px;cursor:w-resize"></div>
+      <div class="ch" id="h-mr" style="top:calc(50% - 5.5px);right:-6px;cursor:e-resize"></div>
+      <div class="ch" id="h-bl" style="bottom:-6px;left:-6px;cursor:sw-resize"></div>
+      <div class="ch" id="h-bm" style="bottom:-6px;left:calc(50% - 5.5px);cursor:s-resize"></div>
+      <div class="ch" id="h-br" style="bottom:-6px;right:-6px;cursor:se-resize"></div>
+    </div>
+
+    <!-- Sidebar -->
+    <div id="crop-sb">
+      <h2>Crop PDF</h2>
+      <p class="sb-sub">Click and drag to select the area you want to keep.</p>
+      <div id="cur-pg-info">No page selected yet</div>
+      <button id="apply-btn" onclick="applyCrop()">
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke="white" stroke-width="2"/><rect x="8" y="8" width="8" height="8" rx="1" stroke="white" stroke-width="1.5"/></svg>
+        Crop PDF
+      </button>
+      <button id="reset-all" onclick="resetAll()">Reset all</button>
+      <div class="sb-div"></div>
+      <span class="sb-lbl">Pages</span>
+      <div class="pages-grp">
+        <label><input type="radio" name="pgmode" value="all" checked> All pages</label>
+        <label><input type="radio" name="pgmode" value="current"> Current page only</label>
+      </div>
+      <div class="sb-div"></div>
+      <span class="sb-lbl">Selection (px)</span>
+      <div class="coords">
+        <div class="cf"><label>X</label><input type="number" id="ci-x" oninput="inputsToBox()"></div>
+        <div class="cf"><label>Y</label><input type="number" id="ci-y" oninput="inputsToBox()"></div>
+        <div class="cf"><label>Width</label><input type="number" id="ci-w" oninput="inputsToBox()"></div>
+        <div class="cf"><label>Height</label><input type="number" id="ci-h" oninput="inputsToBox()"></div>
+      </div>
+      <div class="sb-tip">💡 Drag anywhere on a page to mark the crop area. Drag handles to fine-tune. The dark area will be removed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- DOWNLOAD -->
+<div id="dl-screen">
+  <div class="dl-check">✅</div>
+  <h2>Your PDF is ready!</h2>
+  <p>The cropped PDF has been processed and is ready to download.</p>
+  <button id="dl-btn" onclick="downloadResult()">
+    <svg width="17" height="17" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
+    Download cropped PDF
+  </button>
+  <button id="crop-another" onclick="startOver()">Crop another PDF</button>
+</div>
+
+<!-- PROGRESS -->
+<div id="prog">
+  <div class="prog-card">
+    <p id="prog-msg">Processing…</p>
+    <div class="prog-track"><div id="prog-bar"></div></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── State ──
+let pdfJsDoc=null,pdfLibDoc=null,pdfBytes=null;
+let totalPages=0,fname='document.pdf';
+let zoom=1.0;
+let croppedBytes=null;
+
+// per-page crop data: { pageNum: {x,y,w,h} in PDF pts at scale=1 }
+let savedCrops={};
+
+// active crop box state (canvas-relative px)
+let activePage=null; // page number currently being cropped
+let cb={x:0,y:0,w:0,h:0};
+let hasCrop=false;
+
+// drag state
+let dMode=null,dStart={};
+
+// ── Upload ──
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f?.name.endsWith('.pdf'))loadFile(f)});
+document.getElementById('file-inp').addEventListener('change',e=>{const f=e.target.files[0];if(f)loadFile(f);e.target.value=''});
+
+async function loadFile(file){
+  fname=file.name;
+  showProg('Loading PDF…',15);
+  const ab=await file.arrayBuffer();
+  pdfBytes=new Uint8Array(ab);
+  pdfJsDoc=await pdfjsLib.getDocument({data:pdfBytes.slice()}).promise;
+  pdfLibDoc=await PDFLib.PDFDocument.load(pdfBytes);
+  totalPages=pdfJsDoc.numPages;
+  savedCrops={};croppedBytes=null;hasCrop=false;activePage=null;
+  showProg('Rendering thumbnails…',35);
+  await buildGrid();
+  setP(100);
+  setTimeout(()=>{
+    hideProg();
+    document.getElementById('upload-screen').style.display='none';
+    document.getElementById('dl-screen').classList.remove('open');
+    document.getElementById('thumb-screen').style.display='none';
+    // Directly open crop screen like Word
+    openCropScreen();
+  },300);
+}
+
+async function buildGrid(){
+  const g=document.getElementById('pages-grid');g.innerHTML='';
+  for(let i=1;i<=totalPages;i++){
+    const pg=await pdfJsDoc.getPage(i);
+    const vp=pg.getViewport({scale:.45});
+    const c=document.createElement('canvas');
+    c.width=vp.width;c.height=vp.height;
+    await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+    const card=document.createElement('div');
+    card.className='page-card';card.dataset.page=i;
+    const foot=document.createElement('div');foot.className='pg-foot';
+    const badge=document.createElement('div');badge.className='crop-badge';badge.textContent='CROPPED';
+    const num=document.createElement('div');num.className='pg-num';num.textContent='Page '+i;
+    foot.appendChild(badge);foot.appendChild(num);
+    card.appendChild(c);card.appendChild(foot);
+    card.addEventListener('click',()=>openCropScreen());
+    g.appendChild(card);
+    setP(35+Math.round(60*(i/totalPages)));
+  }
+}
+
+// ── Crop screen open/close ──
+async function openCropScreen(){
+  document.getElementById('crop-screen').classList.add('open');
+  document.getElementById('ctop-fn').textContent=fname;
+  activePage=null;hasCrop=false;
+  hideCropBox();
+  clearCoords();
+  // No pre-selected crop - user must drag to select
+  await renderAllPages();
+}
+
+function closeCropScreen(){
+  document.getElementById('crop-screen').classList.remove('open');
+  // Show upload screen again
+  document.getElementById('upload-screen').style.display='flex';
+}
+
+// ── Render all pages Word-style ──
+async function renderAllPages(){
+  const scroll=document.getElementById('pages-scroll');
+  scroll.innerHTML='';
+
+  // calc zoom: fit page width to available width
+  const pg1=await pdfJsDoc.getPage(1);
+  const raw1=pg1.getViewport({scale:1});
+  const availW=scroll.clientWidth-80;
+  zoom=Math.max(0.3,Math.min(3, availW/raw1.width));
+  document.getElementById('zoom-lbl').textContent=Math.round(zoom*100)+'%';
+
+  for(let i=1;i<=totalPages;i++){
+    const pg=await pdfJsDoc.getPage(i);
+    const vp=pg.getViewport({scale:zoom});
+
+    // wrapper
+    const wrap=document.createElement('div');
+    wrap.className='pg-wrap';
+    wrap.dataset.page=i;
+    wrap.style.width=vp.width+'px';
+    wrap.style.height=vp.height+'px';
+
+    // canvas
+    const cv=document.createElement('canvas');
+    cv.width=vp.width;cv.height=vp.height;
+    cv.dataset.origw=pg.getViewport({scale:1}).width;
+    cv.dataset.origh=pg.getViewport({scale:1}).height;
+    await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+
+    // overlay svg (4 dark rects)
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.classList.add('pg-ov');
+    svg.setAttribute('width',vp.width);svg.setAttribute('height',vp.height);
+    svg.style.width=vp.width+'px';svg.style.height=vp.height+'px';
+    svg.style.display='none';
+    ['ov-t','ov-l','ov-r','ov-b'].forEach(id=>{
+      const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      r.setAttribute('fill','rgba(0,0,0,0.58)');
+      r.dataset.role=id;
+      svg.appendChild(r);
+    });
+
+    // page label
+    const lbl=document.createElement('div');
+    lbl.className='pg-label';lbl.textContent='Page '+i;
+
+    wrap.appendChild(cv);
+    wrap.appendChild(svg);
+    wrap.appendChild(lbl);
+    scroll.appendChild(wrap);
+
+    // Restore saved crop overlay for this page
+    if(savedCrops[i]){
+      const sc=savedCrops[i];
+      const origW=parseFloat(cv.dataset.origw),origH=parseFloat(cv.dataset.origh);
+      const bx=sc.x/origW*vp.width,by=sc.y/origH*vp.height;
+      const bw=sc.w/origW*vp.width,bh=sc.h/origH*vp.height;
+      drawPageOverlay(svg,vp.width,vp.height,bx,by,bw,bh);
+      svg.style.display='block';
+    }
+  }
+
+  // attach mouse events
+  attachMouseEvents();
+  document.getElementById('pg-counter').textContent=totalPages+' page'+(totalPages>1?'s':'');
+
+  // FIX: reposition cbox on scroll so it stays aligned with the page overlay
+  const scrollEl=document.getElementById('pages-scroll');
+  scrollEl.onscroll=()=>{
+    if(!hasCrop||!activePage) return;
+    const wrap=document.querySelector(`.pg-wrap[data-page="${activePage}"]`);
+    if(!wrap) return;
+    const cv=wrap.querySelector('canvas');
+    const r=cv.getBoundingClientRect();
+    positionCbox(r.left+cb.x,r.top+cb.y,cb.w,cb.h);
+  };
+}
+
+// ── Mouse events on scroll area ──
+function attachMouseEvents(){
+  const scroll=document.getElementById('pages-scroll');
+
+  scroll.addEventListener('mousedown',e=>{
+    // Find which page wrap was clicked
+    const wrap=e.target.closest('.pg-wrap');
+    if(!wrap) return;
+    const cv=wrap.querySelector('canvas');
+    const r=cv.getBoundingClientRect();
+    const lx=e.clientX-r.left, ly=e.clientY-r.top;
+    if(lx<0||ly<0||lx>cv.width/window.devicePixelRatio||ly>cv.height/window.devicePixelRatio) return;
+
+    activePage=parseInt(wrap.dataset.page);
+    dMode='draw';
+    dStart={clientX:e.clientX,clientY:e.clientY,lx,ly};
+    hasCrop=false;
+    hideCropBox();
+
+    // clear old overlay on this page
+    const svg=wrap.querySelector('.pg-ov');
+    svg.style.display='none';
+    delete savedCrops[activePage];
+
+    e.preventDefault();
+    e.stopPropagation();
+  });
+}
+
+document.addEventListener('mousemove',e=>{
+  if(!dMode||!activePage) return;
+
+  const wrap=document.querySelector(`.pg-wrap[data-page="${activePage}"]`);
+  if(!wrap) return;
+  const cv=wrap.querySelector('canvas');
+  const r=cv.getBoundingClientRect();
+  const dpr=window.devicePixelRatio||1;
+  const cW=cv.width/dpr, cH=cv.height/dpr;
+
+  const lx=Math.max(0,Math.min(cW, e.clientX-r.left));
+  const ly=Math.max(0,Math.min(cH, e.clientY-r.top));
+
+  if(dMode==='draw'){
+    const nx=Math.min(lx,dStart.lx), ny=Math.min(ly,dStart.ly);
+    const nw=Math.abs(lx-dStart.lx), nh=Math.abs(ly-dStart.ly);
+    cb={x:nx,y:ny,w:nw,h:nh};
+    if(nw>3&&nh>3){
+      hasCrop=true;
+      // position cbox as fixed on screen
+      positionCbox(r.left+nx,r.top+ny,nw,nh);
+      updateCoords(cv);
+    }
+  } else if(dMode==='move'){
+    const dx=e.clientX-dStart.clientX, dy=e.clientY-dStart.clientY;
+    cb.x=Math.max(0,Math.min(cW-dStart.bw, dStart.bx+dx));
+    cb.y=Math.max(0,Math.min(cH-dStart.bh, dStart.by+dy));
+    cb.w=dStart.bw;cb.h=dStart.bh;
+    positionCbox(r.left+cb.x,r.top+cb.y,cb.w,cb.h);
+    updateCoords(cv);
+  } else {
+    // resize handles
+    const dx=e.clientX-dStart.clientX, dy=e.clientY-dStart.clientY;
+    let{bx,by,bw,bh}=dStart;
+    if(dMode.includes('r')){cb.w=Math.max(10,bw+dx);}
+    if(dMode.includes('l')){cb.x=Math.max(0,Math.min(bx+dx,bx+bw-10));cb.w=Math.max(10,bw-dx);}
+    if(dMode.includes('b')){cb.h=Math.max(10,bh+dy);}
+    if(dMode.includes('t')){cb.y=Math.max(0,Math.min(by+dy,by+bh-10));cb.h=Math.max(10,bh-dy);}
+    if(dMode==='tm'||dMode==='bm'){cb.x=bx;cb.w=bw;}
+    if(dMode==='ml'||dMode==='mr'){cb.y=by;cb.h=bh;}
+    positionCbox(r.left+cb.x,r.top+cb.y,cb.w,cb.h);
+    updateCoords(cv);
+  }
+});
+
+document.addEventListener('mouseup',()=>{
+  if(!dMode) return;
+  dMode=null;
+  if(hasCrop&&activePage&&cb.w>5&&cb.h>5){
+    // save crop for this page
+    const wrap=document.querySelector(`.pg-wrap[data-page="${activePage}"]`);
+    if(wrap){
+      const cv=wrap.querySelector('canvas');
+      const dpr=window.devicePixelRatio||1;
+      const origW=parseFloat(cv.dataset.origw),origH=parseFloat(cv.dataset.origh);
+      const cW=cv.width/dpr,cH=cv.height/dpr;
+      savedCrops[activePage]={x:cb.x/cW*origW,y:cb.y/cH*origH,w:cb.w/cW*origW,h:cb.h/cH*origH};
+      // draw overlay on page
+      const svg=wrap.querySelector('.pg-ov');
+      drawPageOverlay(svg,cv.width/dpr,cv.height/dpr,cb.x,cb.y,cb.w,cb.h);
+      svg.style.display='block';
+    }
+    updateCurPageInfo();
+  }
+});
+
+// Handle drag on cbox-mover and handles
+document.getElementById('cbox-mover').addEventListener('mousedown',e=>{
+  if(!activePage) return;
+  dMode='move';
+  dStart={clientX:e.clientX,clientY:e.clientY,bx:cb.x,by:cb.y,bw:cb.w,bh:cb.h};
+  e.stopPropagation();e.preventDefault();
+});
+
+[['h-tl','tl'],['h-tm','tm'],['h-tr','tr'],['h-ml','ml'],['h-mr','mr'],['h-bl','bl'],['h-bm','bm'],['h-br','br']].forEach(([id,m])=>{
+  document.getElementById(id).addEventListener('mousedown',e=>{
+    if(!activePage) return;
+    dMode=m;
+    dStart={clientX:e.clientX,clientY:e.clientY,bx:cb.x,by:cb.y,bw:cb.w,bh:cb.h};
+    e.stopPropagation();e.preventDefault();
+  });
+});
+
+function positionCbox(screenX,screenY,w,h){
+  const box=document.getElementById('cbox');
+  box.style.display='block';
+  box.style.left=screenX+'px';
+  box.style.top=screenY+'px';
+  box.style.width=w+'px';
+  box.style.height=h+'px';
+}
+
+function hideCropBox(){
+  document.getElementById('cbox').style.display='none';
+}
+
+function drawPageOverlay(svg,W,H,x,y,w,h){
+  const rects=svg.querySelectorAll('rect');
+  const data=[
+    [0,0,W,y],
+    [0,y,x,h],
+    [x+w,y,Math.max(0,W-(x+w)),h],
+    [0,y+h,W,Math.max(0,H-(y+h))]
+  ];
+  rects.forEach((r,i)=>{
+    r.setAttribute('x',data[i][0]);r.setAttribute('y',data[i][1]);
+    r.setAttribute('width',data[i][2]);r.setAttribute('height',data[i][3]);
+  });
+}
+
+function updateCoords(cv){
+  const dpr=window.devicePixelRatio||1;
+  const origW=parseFloat(cv.dataset.origw),origH=parseFloat(cv.dataset.origh);
+  const cW=cv.width/dpr,cH=cv.height/dpr;
+  document.getElementById('ci-x').value=Math.round(cb.x/cW*origW);
+  document.getElementById('ci-y').value=Math.round(cb.y/cH*origH);
+  document.getElementById('ci-w').value=Math.round(cb.w/cW*origW);
+  document.getElementById('ci-h').value=Math.round(cb.h/cH*origH);
+  updateCurPageInfo();
+}
+
+function clearCoords(){
+  ['ci-x','ci-y','ci-w','ci-h'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cur-pg-info').textContent='No page selected yet';
+}
+
+function updateCurPageInfo(){
+  if(activePage) document.getElementById('cur-pg-info').textContent=`Page ${activePage} selected`;
+}
+
+function inputsToBox(){
+  if(!activePage) return;
+  const wrap=document.querySelector(`.pg-wrap[data-page="${activePage}"]`);
+  if(!wrap) return;
+  const cv=wrap.querySelector('canvas');
+  const dpr=window.devicePixelRatio||1;
+  const origW=parseFloat(cv.dataset.origw),origH=parseFloat(cv.dataset.origh);
+  const cW=cv.width/dpr,cH=cv.height/dpr;
+  const x=parseFloat(document.getElementById('ci-x').value)||0;
+  const y=parseFloat(document.getElementById('ci-y').value)||0;
+  const w=parseFloat(document.getElementById('ci-w').value)||0;
+  const h=parseFloat(document.getElementById('ci-h').value)||0;
+  cb={x:x/origW*cW,y:y/origH*cH,w:w/origW*cW,h:h/origH*cH};
+  if(w>0&&h>0){
+    hasCrop=true;
+    const r=cv.getBoundingClientRect();
+    positionCbox(r.left+cb.x,r.top+cb.y,cb.w,cb.h);
+    // update overlay
+    const svg=wrap.querySelector('.pg-ov');
+    drawPageOverlay(svg,cW,cH,cb.x,cb.y,cb.w,cb.h);
+    svg.style.display='block';
+    savedCrops[activePage]={x,y,w,h};
+  }
+}
+
+function adjZoom(d){
+  zoom=Math.max(0.2,Math.min(4,Math.round((zoom+d)*100)/100));
+  document.getElementById('zoom-lbl').textContent=Math.round(zoom*100)+'%';
+  reRenderAtZoom();
+}
+
+async function reRenderAtZoom(){
+  const scroll=document.getElementById('pages-scroll');
+  const wraps=scroll.querySelectorAll('.pg-wrap');
+  for(const wrap of wraps){
+    const pn=parseInt(wrap.dataset.page);
+    const pg=await pdfJsDoc.getPage(pn);
+    const vp=pg.getViewport({scale:zoom});
+    const cv=wrap.querySelector('canvas');
+    const dpr=window.devicePixelRatio||1;
+    const origW=parseFloat(cv.dataset.origw),origH=parseFloat(cv.dataset.origh);
+    wrap.style.width=vp.width/dpr+'px';wrap.style.height=vp.height/dpr+'px';
+    cv.width=vp.width;cv.height=vp.height;
+    await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+    const svg=wrap.querySelector('.pg-ov');
+    const cW=vp.width/dpr,cH=vp.height/dpr;
+    svg.setAttribute('width',cW);svg.setAttribute('height',cH);
+    svg.style.width=cW+'px';svg.style.height=cH+'px';
+    if(savedCrops[pn]){
+      const sc=savedCrops[pn];
+      const bx=sc.x/origW*cW,by=sc.y/origH*cH,bw=sc.w/origW*cW,bh=sc.h/origH*cH;
+      drawPageOverlay(svg,cW,cH,bx,by,bw,bh);
+      svg.style.display='block';
+    }
+  }
+  // Reposition floating cbox if active
+  if(activePage&&hasCrop){
+    const wrap=document.querySelector(`.pg-wrap[data-page="${activePage}"]`);
+    if(wrap){
+      const cv=wrap.querySelector('canvas');
+      const r=cv.getBoundingClientRect();
+      const dpr=window.devicePixelRatio||1;
+      const origW=parseFloat(cv.dataset.origw),origH=parseFloat(cv.dataset.origh);
+      const cW=cv.width/dpr,cH=cv.height/dpr;
+      if(savedCrops[activePage]){
+        const sc=savedCrops[activePage];
+        cb.x=sc.x/origW*cW;cb.y=sc.y/origH*cH;cb.w=sc.w/origW*cW;cb.h=sc.h/origH*cH;
+        positionCbox(r.left+cb.x,r.top+cb.y,cb.w,cb.h);
+      }
+    }
+  }
+}
+
+function resetAll(){
+  savedCrops={};hasCrop=false;activePage=null;
+  hideCropBox();clearCoords();
+  document.querySelectorAll('.pg-ov').forEach(svg=>svg.style.display='none');
+}
+
+// ── Apply crop ──
+async function applyCrop(){
+  const mode=document.querySelector('input[name=pgmode]:checked').value;
+  if(mode==='current'&&!activePage){alert('Please draw a crop area on a page first.');return;}
+  if(mode==='current'&&!savedCrops[activePage]){alert('Please draw a crop area on this page first.');return;}
+  if(mode==='all'&&Object.keys(savedCrops).length===0){alert('Please draw a crop area on at least one page first.');return;}
+
+  // For "all pages" mode: use the last drawn crop for all pages
+  let cropData=null;
+  if(mode==='all'){
+    const key=activePage||parseInt(Object.keys(savedCrops)[0]);
+    cropData=savedCrops[key];
+    if(!cropData){alert('Please draw a crop area first.');return;}
+  }
+
+  showProg('Cropping PDF…',10);
+  try{
+    const newDoc=await PDFLib.PDFDocument.create();
+
+    // ── FIX: "current page only" → single-page PDF ──
+    if(mode==='current'){
+      const pn=activePage;
+      const sc=savedCrops[pn];
+      const[cp]=await newDoc.copyPages(pdfLibDoc,[pn-1]);
+      const{width:pw,height:ph}=cp.getSize();
+      const pdfX=sc.x;
+      const pdfY=ph-(sc.y+sc.h);
+      const pdfW=sc.w;
+      const pdfH=sc.h;
+      cp.setCropBox(pdfX,Math.max(0,pdfY),pdfW,pdfH);
+      cp.setMediaBox(pdfX,Math.max(0,pdfY),pdfW,pdfH);
+      newDoc.addPage(cp);
+      setP(90);
+      document.querySelectorAll('.page-card').forEach(card=>{
+        if(parseInt(card.dataset.page)===pn) card.classList.add('has-crop');
+      });
+    } else {
+      // ── "all pages" → every page with same crop ──
+      for(let i=0;i<totalPages;i++){
+        const pn=i+1;
+        const[cp]=await newDoc.copyPages(pdfLibDoc,[i]);
+        const{width:pw,height:ph}=cp.getSize();
+        const sc=cropData;
+        const pdfX=sc.x;
+        const pdfY=ph-(sc.y+sc.h);
+        const pdfW=sc.w;
+        const pdfH=sc.h;
+        cp.setCropBox(pdfX,Math.max(0,pdfY),pdfW,pdfH);
+        cp.setMediaBox(pdfX,Math.max(0,pdfY),pdfW,pdfH);
+        newDoc.addPage(cp);
+        setP(10+Math.round(80*((i+1)/totalPages)));
+      }
+      document.querySelectorAll('.page-card').forEach(card=>card.classList.add('has-crop'));
+    }
+
+    croppedBytes=await newDoc.save();
+    setP(100);
+    setTimeout(()=>{
+      hideProg();
+      document.getElementById('crop-screen').classList.remove('open');
+      document.getElementById('dl-screen').classList.add('open');
+    },300);
+  }catch(err){hideProg();alert('Error: '+err.message);}
+}
+
+function downloadResult(){
+  if(!croppedBytes)return;
+  const blob=new Blob([croppedBytes],{type:'application/pdf'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='cropped_'+fname;
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove()},1000);
+}
+
+function startOver(){
+  pdfJsDoc=null;pdfLibDoc=null;pdfBytes=null;croppedBytes=null;savedCrops={};hasCrop=false;activePage=null;
+  document.getElementById('dl-screen').classList.remove('open');
+  document.getElementById('crop-screen').classList.remove('open');
+  document.getElementById('upload-screen').style.display='flex';
+  document.getElementById('pages-grid').innerHTML='';
+  document.getElementById('pages-scroll').innerHTML='';
+}
+
+// Progress
+function showProg(msg,p){document.getElementById('prog-msg').textContent=msg;setP(p);document.getElementById('prog').classList.add('open')}
+function setP(p){document.getElementById('prog-bar').style.width=p+'%'}
+function hideProg(){document.getElementById('prog').classList.remove('open')}
+</script>
+</body>
+</html>
