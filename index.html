@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stock Flow Tracker</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <h1>Stock Flow Tracker</h1>
+        <p>Setup strength, risk aur discipline ko ek screen par dekhein.</p>
+      </div>
+      <div class="market-clock">
+        <span id="marketState">Market helper</span>
+        <strong id="todayText"></strong>
+      </div>
+    </header>
+
+    <section class="control-band" aria-label="Stock controls">
+      <div class="field grow">
+        <label for="symbolInput">Stock symbol</label>
+        <input id="symbolInput" value="RELIANCE.BSE" placeholder="Example: RELIANCE.BSE, TCS.BSE, IBM">
+      </div>
+      <div class="field grow">
+        <label for="alphaKeyInput">Alpha Vantage API key</label>
+        <input id="alphaKeyInput" type="password" placeholder="API key paste karein">
+      </div>
+      <div class="field">
+        <label for="timeRange">Range</label>
+        <select id="timeRange">
+          <option value="1d">1 day</option>
+          <option value="5d">5 days</option>
+          <option value="1mo">1 month</option>
+          <option value="3mo">3 months</option>
+          <option value="6mo" selected>6 months</option>
+          <option value="1y">1 year</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="timeInterval">Candle</label>
+        <select id="timeInterval">
+          <option value="1m">1 minute</option>
+          <option value="5m">5 minute</option>
+          <option value="15m">15 minute</option>
+          <option value="1d" selected>1 day</option>
+        </select>
+      </div>
+      <button class="primary" id="loadBtn">Analyze</button>
+      <button id="liveBtn">Start Live</button>
+      <button id="saveKeyBtn">Save Key</button>
+      <button id="sampleBtn">Demo Data</button>
+      <label class="file-btn" for="csvFile">Import CSV</label>
+      <input id="csvFile" type="file" accept=".csv,.txt">
+    </section>
+
+    <section class="smart-band" aria-label="Free smart mode">
+      <div>
+        <span class="eyebrow">Free Smart Mode</span>
+        <strong id="requestCounter">Requests: 0 / 20 today</strong>
+        <small id="smartStatus">15-minute refresh recommended for free API.</small>
+      </div>
+      <label>Daily limit
+        <input id="dailyLimitInput" type="number" min="1" max="25" value="20">
+      </label>
+      <label>Manual current price
+        <input id="manualPriceInput" type="number" min="0" step="0.05" placeholder="Current price">
+      </label>
+      <button id="applyManualBtn">Apply Manual Price</button>
+      <button id="resetCounterBtn">Reset Counter</button>
+    </section>
+
+    <section class="status-grid">
+      <article class="signal-panel" id="signalPanel">
+        <span class="eyebrow">Trade Decision</span>
+        <h2 id="signalText">Ready to analyze</h2>
+        <p id="signalReason">Stock load karein ya demo data se start karein.</p>
+        <small id="actionText">Decision yahan dikhega.</small>
+      </article>
+      <article>
+        <span class="eyebrow">Last Price</span>
+        <strong id="lastPrice">-</strong>
+        <small id="priceChange">-</small>
+      </article>
+      <article>
+        <span class="eyebrow">Trend</span>
+        <strong id="trendText">-</strong>
+        <small id="trendDetail">SMA 20 / SMA 50</small>
+      </article>
+      <article>
+        <span class="eyebrow">RSI 14</span>
+        <strong id="rsiText">-</strong>
+        <small id="rsiDetail">Momentum</small>
+      </article>
+      <article>
+        <span class="eyebrow">Volume</span>
+        <strong id="volumeText">-</strong>
+        <small id="volumeDetail">vs 20-day avg</small>
+      </article>
+    </section>
+
+    <section class="workspace">
+      <div class="chart-area">
+        <div class="section-head">
+          <div>
+            <h2 id="chartTitle">Price Flow</h2>
+            <p id="dataSource">No data loaded</p>
+          </div>
+          <div class="legend">
+            <span><i class="price-line"></i>Price</span>
+            <span><i class="sma20-line"></i>SMA 20</span>
+            <span><i class="sma50-line"></i>SMA 50</span>
+          </div>
+        </div>
+        <canvas id="priceChart" width="1000" height="430"></canvas>
+      </div>
+
+      <aside class="decision-panel">
+        <h2>Decision Checklist</h2>
+        <div id="checklist" class="checklist"></div>
+        <div class="trade-levels">
+          <div><span>Entry trigger</span><strong id="entryLevel">-</strong></div>
+          <div><span>Stop loss</span><strong id="stopLevel">-</strong></div>
+          <div><span>Target 1</span><strong id="targetOne">-</strong></div>
+          <div><span>Target 2</span><strong id="targetTwo">-</strong></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="lower-grid">
+      <article class="risk-panel">
+        <div class="section-head">
+          <div>
+            <h2>Risk Calculator</h2>
+            <p>Capital ke hisaab se quantity nikalein.</p>
+          </div>
+        </div>
+        <div class="risk-form">
+          <label>Capital
+            <input id="capitalInput" type="number" value="50000" min="0">
+          </label>
+          <label>Risk %
+            <input id="riskInput" type="number" value="1" min="0.1" step="0.1">
+          </label>
+          <label>Entry
+            <input id="manualEntry" type="number" min="0" step="0.05">
+          </label>
+          <label>Stop
+            <input id="manualStop" type="number" min="0" step="0.05">
+          </label>
+        </div>
+        <div class="risk-output">
+          <div><span>Risk amount</span><strong id="riskAmount">-</strong></div>
+          <div><span>Max quantity</span><strong id="riskQty">-</strong></div>
+          <div><span>Capital used</span><strong id="capitalUsed">-</strong></div>
+        </div>
+      </article>
+
+      <article class="journal-panel">
+        <div class="section-head">
+          <div>
+            <h2>Trade Journal</h2>
+            <p>Decision ka reason save karke repeat mistakes kam karein.</p>
+          </div>
+          <button id="saveJournalBtn">Save Snapshot</button>
+        </div>
+        <textarea id="journalNote" placeholder="Trade lene ka reason, avoid karne ka reason, ya apni observation likhein."></textarea>
+        <div id="journalList" class="journal-list"></div>
+      </article>
+    </section>
+
+    <section class="import-help">
+      <h2>CSV format</h2>
+      <code>Date, Open, High, Low, Close, Volume</code>
+      <p>Alpha Vantage ke liye Indian examples: <strong>RELIANCE.BSE</strong>, <strong>TCS.BSE</strong>. CSV import bhi chalega. Decision signal education aur risk discipline ke liye hai; final trade apne risk par karein.</p>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
